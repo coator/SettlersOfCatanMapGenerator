@@ -1,12 +1,11 @@
 from collections import Counter
-from random import shuffle, randint
+from itertools import islice
+from random import shuffle
 import matplotlib.pyplot as plt
 from matplotlib.patches import RegularPolygon
 import numpy as np
 import shapely.geometry as sg
 import shapely.ops as so
-
-pip_values = (2, 3, 3, 4, 4, 5, 5, 6, 6, 7, 7, 8, 8, 9, 9, 10, 10, 11, 11, 12)
 
 standard_map_shape = [[-1, 0, 0],
                       [0, 0, 0],
@@ -30,43 +29,53 @@ standard_map_shape = [[-1, 0, 0],
                       ]
 
 
-class pip:
-    def __init__(self, board_location, tile, value):
-        self.tile = tile
-        self.value = value
-        self.board_location = board_location
+# a class I created that I have not used
+# class pip:
+#    def __init__(self, board_location, tile, value):
+#        self.tile = tile
+#        self.value = value
+#        self.board_location = board_location
 
 
 def rsrc_shfl():
+    # Originally was planned so that if there were two resources near each other the resources will reshuffle, but since
+    # I have implemented a system to reshuffle if resource_clustering is above threshold I have eliminated this feature
     pr = [
         'field', 'field', 'field', 'field', 'pasture', 'pasture', 'pasture', 'pasture', 'forest', 'forest', 'forest',
         'forest', 'hill', 'hill', 'hill', 'mountain', 'mountain', 'mountain', 'desert']
-    # if there are two resources next to each other in the list the numbers will to rerolled
     shuffle(pr)
-    item = 0
-    while item in range(len(pr) - 1):
-        if pr[item] == pr[item + 1]:
-            # print(f'Matching resources at {item} and {item + 1}')
-            shuffle(pr)
-            item = 0
-        else:
-            item += 1
+    #    item = 0
+    # while item in range(len(pr) - 1):
+    #    if pr[item] == pr[item + 1]:
+    #        shuffle(pr)
+    #        item = 0
+    #    else:
+    #        item += 1"""
     return tuple(pr)
 
 
-def rsrc_divsr_calc(*argv):
+def rsrce_distrib_calc(*argv):
     # Resource distribution is calculated by dividing the map into half 3 times, summing the difference of squares
-    # on the two sides for each resource.
+    # on the two sides for each resource, each time the map is divided.
     total = 0
     for arg in argv:
+        #print(arg)
         differences = Counter(arg[:7] * 6) + Counter(arg[8:12] * 3) - Counter(arg[13:] * 6) + Counter(arg[8:12] * 3)
         # var is squaring the difference amount
         total = + sum(x ** 2 for x in differences.values())
+    #print(total)
     return total
 
 
 def item_touches_calc(map_tiles):
-    r = lambda: randint(0, 255)
+    # tThis calculator uses shapely to build a Matplotlib map and then determines if the tiles are touching with a for
+    # loop it is quite possible I will remove this later as I know have a list that does not change unless the board
+    # changes
+    # _______________________________________________________________
+    # Originally I had functionality to generate the board since I was unsure how it would look but I have commented
+    # that out
+
+    # I had r = lambda: randint(0, 255)
     r1layout = [(0, 0), (1, 1), (1, 2), (0, 3), (0, 0)]
     r2layout = [(0, 0), (-1, 1), (-1, 2), (0, 3), (0, 0)]
     plot_start = ((0, 0), (2, 0), (4, 0),
@@ -76,8 +85,8 @@ def item_touches_calc(map_tiles):
                   (0, -8), (2, -8), (4, -8))
 
     def poly_adjust(layout, layout2, plotstartpoints):
-        #fig, axs = plt.subplots()
-        #axs.set_aspect('equal', 'datalim')
+        # fig, axs = plt.subplots()
+        # axs.set_aspect('equal', 'datalim')
         output = []
         for y in plotstartpoints:
             temp, temp2 = [], []
@@ -88,29 +97,29 @@ def item_touches_calc(map_tiles):
             r2 = sg.Polygon(temp2)
             new_shape = so.cascaded_union([r1, r2])
             output.append(new_shape)
-            #xs, ys = new_shape.exterior.xy
-            #axs.fill(xs, ys, alpha=0.5, fc='#%02X%02X%02X' % (r(), r(), r()), ec='none')
+            # xs, ys = new_shape.exterior.xy
+            # axs.fill(xs, ys, alpha=0.5, fc='#%02X%02X%02X' % (r(), r(), r()), ec='none')
         return output
 
     totalpoints_calc = poly_adjust(r1layout, r2layout, plot_start)
-    #print(totalpoints_calc)
-    #print(totalpoints_calc[0].touches(totalpoints_calc[2]))
-    totalpoints=0
+    # print(totalpoints_calc)
+    # print(totalpoints_calc[0].touches(totalpoints_calc[2]))
+    totalpoints = 0
 
     for anum in range(len(totalpoints_calc)):
         for bnum in range(len(totalpoints_calc)):
             tch_tst = totalpoints_calc[anum].touches(totalpoints_calc[bnum])
             sm_tl_tst = map_tiles[anum] == map_tiles[bnum]
             if tch_tst and sm_tl_tst:
-                totalpoints+=5
+                totalpoints += 5
             else:
                 pass
-    print(totalpoints)
+    # print(totalpoints)
     return totalpoints
 
 
-# [vertical coord,vertical coord,
 def catan_map_generator(resource_layout, map_shape):
+    # generates the map once the parameters are acceptable.
     map_tiles = []
     for item in range(len(resource_layout)):
         if resource_layout[item] == 'mountain':
@@ -126,7 +135,7 @@ def catan_map_generator(resource_layout, map_shape):
         elif resource_layout[item] == 'desert':
             map_tiles.append(['White', 'Desert'])
         else:
-            print(resource_layout[item])
+            print(resource_layout[item], ' was not counted')
 
     # Horizontal cartesian coords
     hcoord = [c[0] for c in map_shape]
@@ -156,35 +165,81 @@ def catan_map_generator(resource_layout, map_shape):
     return map_tiles
 
 
-def rsrc_whole_calc(tol_rsrc_distrib,tol_same_tiles):
+def pv_distribution(pv_dist_tol):
+    while True:
+        g = []
+        pv = [2, 3, 3, 4, 4, 5, 5, 6, 6, 8, 8, 9, 9, 10, 10, 11, 11, 12]
+        pv_dice_chance = [1, 2, 2, 3, 3, 4, 4, 5, 5, 5, 5, 4, 4, 3, 3, 2, 2, 1]
+        tile_shfl = list(zip(pv, pv_dice_chance))
+        shuffle(tile_shfl)
+        length_to_split = [4, 4, 4, 3, 3]  # could be used for other combinations in expansions
+        inp = iter(tile_shfl)
+        out = [list(islice(inp, elem)) for elem in length_to_split]
+        for x in out:
+            expected = round(float(len(x) * 58 / 18), 3)
+            actual = sum(x[1])
+            g.append((expected - actual) ** 2)
+        g = sum(g)
+        if g > pv_dist_tol:
+            continue
+        else:
+            #print(tile_shfl,'wheeeee')
+            tile_shfl.append((0,0))
+            ts_total = resource_split(tile_shfl)
+            #print(ts_total)
+            g = rsrce_distrib_calc(tile_shfl, ts_total[0], ts_total[1])
+        #pick up on here later/tomorrow
+        print(g)
+
+
+def resource_split(board):
+    board2 = (
+        board[7], board[3], board[0], board[12], board[8], board[4], board[1], board[16], board[13], board[9],
+        board[5], board[2], board[17], board[14], board[10], board[6], board[18], board[15], board[11])
+
+    # 60 degree shift of tiles to represent 3rd line
+    board3 = (
+        board[16], board[12], board[7], board[17], board[13], board[8], board[3], board[18], board[14], board[9],
+        board[4]
+        , board[0], board[16], board[10], board[5], board[1], board[11], board[6], board[2])
+
+    boardtotal = board2, board3
+    return boardtotal
+
+
+def rsrc_whole_calc(tol_rsrc_distrib, tol_same_tiles, pv_dist_tol):
     # function combines multiple functions that determines if resource distribution and resource clustering is in acceptable
     # standards and if not, it reshuffles the board
     while True:
         # generates board
         pr = rsrc_shfl()
 
-        # 30 degree shift of tiles to represent 2nd line
-        pr2 = (
-            pr[7], pr[3], pr[0], pr[12], pr[8], pr[4], pr[1], pr[16], pr[13], pr[9], pr[5], pr[2], pr[17], pr[14],
-            pr[10], pr[6]
-            , pr[18], pr[15], pr[11])
+        #        # 30 degree shift of tiles to represent 2nd line
+        #       pr2 = (
+        #          pr[7], pr[3], pr[0], pr[12], pr[8], pr[4], pr[1], pr[16], pr[13], pr[9], pr[5], pr[2], pr[17], pr[14],
+        #         pr[10], pr[6]
+        #        , pr[18], pr[15], pr[11])
+        #
+        #       # 60 degree shift of tiles to represent 3rd line
+        #      pr3 = (
+        #         pr[16], pr[12], pr[7], pr[17], pr[13], pr[8], pr[3], pr[18], pr[14], pr[9], pr[4], pr[0], pr[16], pr[10],
+        #        pr[5], pr[1]
+        #       , pr[11], pr[6], pr[2])
 
-        # 60 degree shift of tiles to represent 3rd line
-        pr3 = (
-            pr[16], pr[12], pr[7], pr[17], pr[13], pr[8], pr[3], pr[18], pr[14], pr[9], pr[4], pr[0], pr[16], pr[10],
-            pr[5], pr[1]
-            , pr[11], pr[6], pr[2])
+        btotal = resource_split(pr)
 
-        distribution_outcome = rsrc_divsr_calc(pr, pr2, pr3)
+        distribution_outcome = rsrce_distrib_calc(pr, btotal[0], btotal[1])
         distribution_boolean = distribution_outcome > tol_rsrc_distrib
         item_touches_outcome = item_touches_calc(pr)
         item_touches_boolean = item_touches_outcome > tol_same_tiles
         if item_touches_boolean and distribution_boolean:
             print(distribution_boolean, item_touches_boolean)
-            catan_map_generator(pr, standard_map_shape)
+            a = pv_distribution(pv_dist_tol)
+            print(round(a, 0))
+            # catan_map_generator(pr, standard_map_shape)
             return
         else:
             continue
 
 
-print(rsrc_whole_calc(200,30))
+rsrc_whole_calc(200, 30, 10)
