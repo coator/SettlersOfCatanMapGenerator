@@ -1,3 +1,5 @@
+# https://www.boardgameanalysis.com/what-is-a-balanced-catan-board/
+
 from collections import Counter
 from itertools import islice
 from random import shuffle
@@ -54,16 +56,16 @@ def rsrc_shfl():
     return tuple(pr)
 
 
-def rsrce_distrib_calc(*argv):
+def tile_resource_distribution(*argv):
     # Resource distribution is calculated by dividing the map into half 3 times, summing the difference of squares
     # on the two sides for each resource, each time the map is divided.
     total = 0
     for arg in argv:
-        #print(arg)
+        # print(arg)
         differences = Counter(arg[:7] * 6) + Counter(arg[8:12] * 3) - Counter(arg[13:] * 6) + Counter(arg[8:12] * 3)
         # var is squaring the difference amount
         total = + sum(x ** 2 for x in differences.values())
-    #print(total)
+    # print(total)
     return total
 
 
@@ -165,7 +167,7 @@ def catan_map_generator(resource_layout, map_shape):
     return map_tiles
 
 
-def pv_distribution(pv_dist_tol):
+def pipvalue_distribution_per_resource(pv_dist_tol):
     while True:
         g = []
         pv = [2, 3, 3, 4, 4, 5, 5, 6, 6, 8, 8, 9, 9, 10, 10, 11, 11, 12]
@@ -181,15 +183,32 @@ def pv_distribution(pv_dist_tol):
             g.append((expected - actual) ** 2)
         g = sum(g)
         if g > pv_dist_tol:
-            continue
+            pass
         else:
-            #print(tile_shfl,'wheeeee')
-            tile_shfl.append((0,0))
-            ts_total = resource_split(tile_shfl)
-            #print(ts_total)
-            g = rsrce_distrib_calc(tile_shfl, ts_total[0], ts_total[1])
-        #pick up on here later/tomorrow
-        print(g)
+            tile_shfl.append((0, 0))
+            ts_total = list(resource_split(tile_shfl))
+            g = []
+            for x in ts_total:
+                for xx in x:
+                    g.append(xx)
+            tile_shfl = tile_shfl, list(g[0:19]), list(g[19:])
+            pipvalue_distribution_board(tile_shfl)
+
+
+def pipvalue_distribution_board(*argv):
+    g = [0, 0]
+    for arg in argv:
+        for argitem in arg:
+            g[0] = sum((Counter(argitem[:7][1]) + (Counter(argitem[8:12][1])) - \
+                           Counter(argitem[13:][1]) + Counter(argitem[8:12][1])).values())
+            g[1]=g[0]+g[1]
+    g=g[1]
+    print(g)
+    return g
+
+
+
+    #total = + sum(x ** 2 for x in differences.values())
 
 
 def resource_split(board):
@@ -207,7 +226,7 @@ def resource_split(board):
     return boardtotal
 
 
-def rsrc_whole_calc(tol_rsrc_distrib, tol_same_tiles, pv_dist_tol):
+def rsrc_whole_calc(tol_rsrc_distrib, tol_same_tiles, pv_dist_tol_per_resource,tolerance_pip_distribution):
     # function combines multiple functions that determines if resource distribution and resource clustering is in acceptable
     # standards and if not, it reshuffles the board
     while True:
@@ -228,18 +247,15 @@ def rsrc_whole_calc(tol_rsrc_distrib, tol_same_tiles, pv_dist_tol):
 
         btotal = resource_split(pr)
 
-        distribution_outcome = rsrce_distrib_calc(pr, btotal[0], btotal[1])
+        distribution_outcome = tile_resource_distribution(pr, btotal[0], btotal[1])
         distribution_boolean = distribution_outcome > tol_rsrc_distrib
         item_touches_outcome = item_touches_calc(pr)
         item_touches_boolean = item_touches_outcome > tol_same_tiles
         if item_touches_boolean and distribution_boolean:
-            print(distribution_boolean, item_touches_boolean)
-            a = pv_distribution(pv_dist_tol)
-            print(round(a, 0))
-            # catan_map_generator(pr, standard_map_shape)
+            piplistlist = pipvalue_distribution_per_resource(pv_dist_tol_per_resource)
             return
         else:
             continue
 
 
-rsrc_whole_calc(200, 30, 10)
+rsrc_whole_calc(200, 30, 10,10)
